@@ -1,0 +1,453 @@
+---
+title: "Martingale-Strategy"
+author: "Minu Choi"
+format: pdf
+editor: visual
+---
+
+# Roulette
+
+A roulette table composed of 38 (or 37) evenly sized pockets on a wheel. The pockets are colored red, black, or green. The pockets are also numbered. Roulette is a game of chance in which a pocket is randomly selected. Gamblers may wager on several aspects of the outcome. For example, one may place a wager that the randomly selected pocket will be red or odd numbered or will be a specific number.
+
+For this assignment, all one needs to know is that there are 38 pockets of which 2 are green, 18 are red, and 18 are black. The payout for a bet on black (or red) is \$1 for each \$1 wagered. This means that if a gambler bets \$1 on black and the randomly selected pocket is black, then the gambler will get the original \$1 wager and an additional \$1 as winnings.
+
+## Roulette strategies
+
+There are several *strategies* for playing roulette. (*Strategies* is in italics because the house always wins, in the long run.) Consider one such strategy:
+
+This is a classic roulette strategy called the “Martingale” strategy. Consider how the strategy playes out for a single sequence of spins {Black, Black, Red}.
+
+| Play | Wager | Outcome | Earnings |
+|:----:|:-----:|:-------:|:--------:|
+|  1   |   1   |  Black  |    -1    |
+|  2   |   2   |  Black  |    -3    |
+|  3   |   4   |   Red   |    +1    |
+
+\newpage
+
+Now consider a sequence {Black, Black, Black, Red}.
+
+| Play | Wager | Outcome | Earnings |
+|:----:|:-----:|:-------:|:--------:|
+|  1   |   1   |  Black  |    -1    |
+|  2   |   2   |  Black  |    -3    |
+|  3   |   4   |  Black  |    -7    |
+|  4   |   8   |   Red   |    +1    |
+
+The Martingale strategy appears to always end in positive earnings, regardless of how unlucky a string of spins may be. Is the strategy actually profitable?
+
+## Additional assumptions for the simulation.
+
+### Stopping rule
+
+A player will use the above strategy and play until
+
+1.  the player has **`winning_threshold`** dollars
+2.  the player goes bankrupt
+3.  the player completes **`max_games`** wagers (or plays)
+
+### Budget
+
+The player starts with **`starting_budget`** dollars. The player cannot wager more money than he/she has.
+
+### Maximum wager
+
+Some casinos have a maximum bet. Call this parameter **`max_wager`**. If the strategy directs the player to wager more than `max_wager` dollars, then the player will only wager `max_wager` dollars.
+
+\newpage
+
+## Summary of parameters
+
+| Parameter | Description | Starting value |
+|:-----------------:|:-----------------------|:----------------------------:|
+| **`starting_budget`** | Starting budget | \$200 |
+| **`winning_threshold`** | Winnings threshold for stopping | \$300 (Starting budget + \$100 winnings) |
+| **`max_games`** | Time threshold for stopping | 1000 plays |
+| **`max_wager`** | Casino’s maximum wager | \$100 |
+
+## An alternative, computationally faster solution
+
+\*Professor Gianluca Gudagni approved me to analyze this version of code instead of the first one.
+
+```{r}
+martingale_wager <- function(
+    previous_wager
+  , previous_outcome
+  , max_wager
+  , current_budget
+){
+  if(previous_outcome == 1) return(1)
+  min(2*previous_wager, max_wager, current_budget)
+}
+
+
+profit <- function(l1) l1[nrow(l1),4] - l1[1,1]
+
+one_series <- function(ng, sb, wt, mw){
+# ng = max number of spins
+# sb = starting budget
+# wt = winning threshold
+# mw = max wager
+  l1 <- matrix(NA_integer_,nrow=ng,ncol=4)
+  l1[,3] <- rbinom(ng,1,18/38)
+  l1[1,1] <- sb
+  l1[1,2] <- 1
+  l1[1,4] <- ifelse(l1[1,3]==1, sb + 1, sb - 1)
+
+  for(i in 2:ng){
+    w <- martingale_wager(l1[i-1,2], l1[i-1,3], mw, l1[i-1,4])
+    e <- ifelse(l1[i,3]==1, l1[i-1,4] + w, l1[i-1,4] - w)
+    s <- e <= 0 | e >= wt
+    l1[i,c(1,2,4)] <- c(l1[i-1,4], w, e)
+    if(s) break
+  }
+  l1[1:i,]
+}
+
+one_series(100,200,300,100)[,4] |> plot(type = "l", xlim = c(0,100), ylim = c(0,300), xlab = 'Number of Spins', ylab = 'Budget after Each Game')
+```
+
+\newpage
+
+When trying to computationally simulate the martingale strategy, I first broke it down to potential functions that would be needed. One of them is a function that simulates the wager for each round of the spins. This `martingale_wager()` function is responsible for calculating the next bet based on the outcome of the previous round (either 1 (win) or 0 (loss)). The idea is that after each loss, the wager is doubled, so that when a win eventually occurs, it recovers all previous losses and adds a profit equal to the initial wager. However, after a win, the wager is reset back to its base value, \$1.
+
+-   The function takes in four arguments:
+
+    1.  **`previous_wager`**: Money bet in the previous round
+
+    2.  **`previous_outcome`**: Outcome of the previous round (1 == win, 0 == loss)
+
+    3.  **`max_wager`**: Maximum amount allowed to bet
+
+    4.  **`current_budget`**: Current budget after the previous round
+
+-   **Logic**:
+
+    1.  **Win Condition (`if(previous_outcome == 1) return(1)`)**:
+
+        -   If the player won the previous round, the function resets the wager back to the base value of \$1, as per the Martingale strategy
+
+    2.  **Loss Condition (`min(2 * previous_wager, max_wager, current_budget)`)**:
+
+        -   If the player lost, the function doubles the previous wager (`2 * previous_wager`). However, this new wager is constrained by two limits:
+
+            -   The **maximum allowed wager** (`max_wager`), as the casino might limit how much can be bet.
+
+            -   The **player’s current budget** (`current_budget`), to ensure they don’t bet more than they can afford
+
+        -   The `min()` function is used to ensure that the next wager is the smallest value among these three options: twice the previous wager, the casino's maximum wager, and the player’s available budget. This prevents the player from betting more than the casino allows or more than they have.
+
+**`one_series <- function(ng, sb, wt, mw)`**
+
+The `one_series` function simulates a series of roulette games using the Martingale betting strategy.
+
+\newpage
+
+### Inputs:
+
+-   **`ng` (max number of spins)**
+
+-   **`sb` (starting budget)**
+
+-   **`wt` (winning threshold)**: Amount of money the player wants to reach. The player stops playing when they either go bankrupt or their budget exceeds this threshold
+
+-   **`mw` (max wager)**: A constraint often set by casinos
+
+### **Matrix set-up:**
+
+`l1 <- matrix(NA_integer_, nrow=ng, ncol=4)`
+
+-   **`l1`**: This matrix will store all the information about each game the player plays. It has 4 columns:
+
+    1.  **Column 1**: Starting budget before each game.
+
+    2.  **Column 2**: Wager placed in the game.
+
+    3.  **Column 3**: Game outcome (1 for a win, 0 for a loss).
+
+    4.  **Column 4**: Ending budget after each game.
+
+`l1[,3] <- rbinom(ng, 1, 18/18)`
+
+-   The third column of `l1` is the output of random binary outcomes using the `rbinom()` function. The probability of winning (1) is $$\frac{18}{38}$$ (probability of landing on red), and the probability of losing (0) is $$\frac{20}{38}$$ (probability of landing on 18 black + 2 green).
+
+### **First Game Set-up:**
+
+-   **`l1[1,1] <- sb`**: Initial starting budget is set in column 1.
+
+-   **`l1[1,2] <- 1`**: First wager of \$1 in the first game (Martingale strategy begins with \$1)
+
+-   **Outcome Check for First Game**:
+
+    -   `l1[1,4] <- ifelse(l1[1,3]==1, sb + 1, sb - 1)` updates the **ending budget** (column 4) based on the outcome of the first game `l1[1,3]`:
+
+        -   If the ball lands on red, (`l1[1,3] == 1`), they gain \$1 (`sb + 1`).
+
+        -   If it does not, (`l1[1,3] == 0`), they lose \$1 (`sb - 1`).
+
+### **Game Loop:**
+
+`for (i in 2:ng)`
+
+-   The for loop simulates each game, from the second game (i = 2) until it reaches the maximum number of games or the stopping condition (bankruptcy or winning threshold)
+
+### **Wager Calculation:**
+
+`w <- martingale_wager(l1[i-1,2], l1[i-1,3], mw, l1[i-1,4])`
+
+-   **`l1[i-1,2]`**: This is the **wager** in the **previous game**. In this Martingale strategy, the next wager is dependent on the previous outcome. If the player won, the wager is reset to 1. if they lost, the wager doubles.
+
+-   **`l1[i-1,3]`**: This is the **outcome** of the **previous game**. It shows whether the player won or lost the previous game.
+
+-   **`l1[i-1,4]`**: This is the **ending budget** from the **previous game**. The wager in the current game must not exceed the available budget. This is why the value is passed to the `martingale_wager()` function to ensure the wager is constrained by the available funds.
+
+-   **Why Use `i-1`?** The roulette spin is a sequential game in which the outcome of the current game depends on previous outcome. Therefore, the function has to recall back to the **previous game** (`i-1`) to determine the move for the **current game** (`i`).
+
+### **Budget Update:**
+
+`e <- ifelse(l1[i,3] == 1, l1[i-1, 4] + w, l1[i-1, 4] - w)`
+
+**Budget after current game (`e`)**: Updates the budget after the current game outcome (`l1[i,3]`):
+
+-   If the player wins (`l1[i,3] == 1`), their budget increases by the wager.
+
+-   If they lose, their budget decreases by the wager.
+
+### **Stopping Condition:**
+
+`if e <= 0 | e >= wt`
+
+**Stopping Condition (`s`)**: As part of the for loop, this will check if the player has hit one of two stopping conditions:
+
+-   **Bankruptcy** (`e <= 0`).
+
+-   **Winning threshold** (`e >= wt`).
+
+-   `if(s) break`
+
+    -   If either condition is met, the loop will stop.
+
+### **Updating the `l1` Matrix:**
+
+`l1[i, c(1, 2, 4)] <- c(l1[i-1,4], w, e)`
+
+This updates the matrix for the current game:
+
+-   **Column 1**: The player’s starting budget for the current game (which is the ending budget from the previous game).
+
+-   **Column 2**: The amount the player wagered in the current game.
+
+-   **Column 4**: The player’s ending budget after the current game.
+
+### **Final Output:**
+
+`l1[1:i, ]`
+
+The function returns the portion of the matrix `l1` that contains all the games the player actually played (from game 1 to the last game before stopping).
+
+### **Profit Function:**
+
+`profit <- function(l1) l1[nrow(l1),4] - l1[1,1]`
+
+The profit function calculates the profit by subtracting the ending budget from the starting budget.
+
+-   **Input (`l1`)**:
+
+    -   The function takes one argument, `l1`, a **matrix** of the player’s performance over multiple games
+
+    -   In the matrix `l1`, each row represents a specific game, and the columns represent different values:
+
+        -   **Column 1**: Starting budget at the beginning of each game.
+
+        -   **Column 2**: Wager for each game.
+
+        -   **Column 3**: Outcome of each game (1 = win, 0 = loss).
+
+        -   **Column 4**: Budget at the end of each game.
+
+-   **`nrow(l1)`**:
+
+    -   `nrow(l1)` gives the **number of rows** in the matrix `l1` (number of games played)
+
+-   **`l1[nrow(l1), 4]`**:
+
+    -   The **ending budget** of the player after the **last game** (the value of the last row of the 4th column), representing final budget after the game
+
+-   **`l1[1, 1]`**:
+
+    -   This accesses the player’s **starting budget** before the first game
+
+### **Visualization:**
+
+`one_series(100,200,300,100)[,4] |> plot(type = "l", xlim = c(0,100), ylim = c(0,300))`
+
+-   This simulates the Martingale Strategy by calling the `one_series` function with the following parameters:
+
+    -   Maximum Number of Games: 100
+
+    -   Starting Budget: 200
+
+    -   Winning Threshold: 300
+
+    -   Maximum Wager: 100
+
+-   `[,4]` extracts the fourth column (representing the ending budget after each game) from the matrix, `l1`
+
+-   `plot(type = "l", xlim = c(0, 100), ylim = c(0, 300))`
+
+    -   The `plot()` function generates a plot of the ending budgets for each game
+
+    -   `type = "l"` specifies a line plot, where the values are connected by lines
+
+    -   `xlim = c(0, 100)` sets the limit for the x-axis as 0 to 100, which is the number of games played
+
+    -   `ylim = c(0, 300)` sets the limit for the y-axis as 0 to 300, which is the player's budget after each game. In other words, the y-axis shows values from 0 (bankruptcy) to 300 (the winning threshold)
+
+## Calculating Average Number of Plays
+
+```{r}
+simulate_spins <- function(n_simulations, ng, sb, wt, mw) {
+  total_spins <- replicate(n_simulations, nrow(one_series(ng, sb, wt, mw)))
+  avg_plays <- mean(total_spins)
+  avg_plays
+}
+
+set.seed(123)
+n_simulations <- 1000
+average_plays <- simulate_spins(n_simulations, 100, 200, 300, 100)
+average_plays
+```
+
+To estimate the average number of plays before stopping, I created a new function, `simulate_spins`. This functions takes as input the number of simulations (`n_simulations`), maximum number of spins per simulation (`ng`), starting budget (`sb`), winning threshold (`wt`), and maximum wager (`mw`). It runs the `n_simulations` using the `replicate()` function, and calls `one_series()` for each simulation. Each call to `one_series()` returns the number of plays it took for the player to stop. The total number of plays is recorded, and the mean of these plays is calculated to determine the average number of plays before stopping.
+
+## Changing a Parameter of the simulation
+
+### 1. **Max Games (`ng)`**
+
+-   **Impact on Average Earnings:**
+
+    -   A **higher maximum number of games** increases the chance that the player will eventually win, as the Martingale strategy is designed to recover losses eventually (in theory). However, in practice, the longer the game goes on, the more likely the player is to experience long losing streaks that could bankrupt them.
+
+    -   A **lower maximum number of games** reduces the total number of spins, possibly stopping the player before they can recover from losses or hit a win. This could lead to lower average earnings.
+
+-   **Explanation:**
+
+    -   The time threshold limits how many games a player can play. If the threshold is set too low, the player may not get enough chances to recover losses.
+
+-   **Graph:**
+
+    ```{r}
+    par(mfrow = c(1, 2))
+
+    plot(one_series(50,200,300,100)[,4], type = "l", xlim = c(0, 200), ylim = c(0, 300), 
+         xlab = 'Number of Spins', ylab = 'Budget after Each Game', 
+         main = "Lower limit of Max Spins")
+
+    plot(one_series(200,200,300,100)[,4], type = "l", xlim = c(0, 200), ylim = c(0, 300), 
+         xlab = 'Number of Spins', ylab = 'Budget after Each Game', 
+         main = "Higher limit of Max Spins")
+
+    par(mfrow = c(1, 1))
+    ```
+
+### 
+
+### 2. **Starting Budget (`sb)`**
+
+-   **Impact on Average Earnings:**
+
+    -   A **higher starting budget** allows the player to withstand more losses before going bankrupt, which can increase the average number of spins and potentially lead to higher earnings if they eventually win.
+
+    -   A **lower starting budget** would mean the player is more likely to go bankrupt before reaching the winning threshold, leading to fewer spins and a higher chance of losing the entire budget.
+
+-   **Explanation:**
+
+    -   In the Martingale strategy, the player doubles their wager after each loss. If the starting budget is low, the player may not be able to double their wager enough times to recover from a series of losses, increasing the risk of going bankrupt.
+
+-   **Graph:**
+
+    ```{r}
+    par(mfrow = c(1, 2))
+
+    plot(one_series(200,200,300,100)[,4], type = "l", xlim = c(0, 200), ylim = c(0, 400), 
+         xlab = 'Number of Spins', ylab = 'Budget after Each Game', 
+         main = "Lower Starting Budget")
+
+    plot(one_series(200,300,400,100)[,4], type = "l", xlim = c(0, 200), ylim = c(0, 400), 
+         xlab = 'Number of Spins', ylab = 'Budget after Each Game', 
+         main = "Higher Starting Budget")
+
+    par(mfrow = c(1, 1))
+    ```
+
+### 3. **Winning Threshold (`wt)`**
+
+-   **Impact on Average Earnings:**
+
+    -   A **higher winning threshold** increases the number of spins required to reach the target, leading to longer games and more opportunities to lose money along the way, potentially reducing average earnings.
+
+    -   A **lower winning threshold** allows the player to stop playing after fewer wins, reducing exposure to losses and potentially increasing the chances of walking away with some profit.
+
+-   **Explanation:**
+
+    -   In simulations, if the winning threshold is set too high, players will need to risk more before they can stop, which can result in more losses and lower overall earnings.
+
+-   **Graph:**
+
+    ```{r}
+    par(mfrow = c(1, 2))
+
+    plot(one_series(200,100,300,100)[,4], type = "l", xlim = c(0, 200), ylim = c(0, 300), 
+         xlab = 'Number of Spins', ylab = 'Budget after Each Game', 
+         main = "Lower Winning Threshold")
+
+    plot(one_series(200,100,500,100)[,4], type = "l", xlim = c(0, 200), ylim = c(0, 300), 
+         xlab = 'Number of Spins', ylab = 'Budget after Each Game', 
+         main = "Higher Winning Threshold")
+
+    par(mfrow = c(1, 1))
+    ```
+
+\newpage
+
+### 4. **Maximum Wager (`mw`)**
+
+-   **Impact on Average Earnings:**
+
+    -   A **higher maximum wager** allows the player to continue doubling their bet during a losing streak, increasing the chance of eventually winning back their losses. However, this also increases the risk of substantial losses if they hit the wager cap before winning.
+
+    -   A **lower maximum wager** prevents the player from doubling their bets beyond a certain point, which can limit the effectiveness of the Martingale strategy, as they may not recover losses after a long losing streak.
+
+-   **Explanation:**
+
+    -   The maximum wager limits how much a player can bet. If the cap is reached during a long losing streak, the Martingale strategy breaks down, as the player can no longer double their wager to recover previous losses, which could reduce average earnings.
+
+-   **Graph:**
+
+    ```{r}
+    par(mfrow = c(1, 2))
+
+    plot(one_series(200,200,500,100)[,4], type = "l", xlim = c(0, 200), ylim = c(0, 400), 
+         xlab = 'Number of Spins', ylab = 'Budget after Each Game', 
+         main = "Lower Maximum Wager")
+
+    plot(one_series(200,200,500,300)[,4], type = "l", xlim = c(0, 200), ylim = c(0, 400), 
+         xlab = 'Number of Spins', ylab = 'Budget after Each Game', 
+         main = "Higher Maximum Wager")
+
+    par(mfrow = c(1, 1))
+    ```
+
+## Limitations of The Simulation
+
+### 1. Binary Outcomes
+
+The simulation minimizes and simplifies the outcome of each roulette spin to a binary outcome (either win or loss) based solely on the color of the pocket (red vs black/green). The simulation does NOT consider betting strategies such as betting on specific numbers, combinations, even/odd numbers). These factors could easily produce different results.
+
+### 2. Casino Rules and Limits
+
+The simulation implements a fixed maximum wager (`max_wager`) that is constant throughout the entirety of the simulation. However, we know that casinos, whose goal is to maximize the profits of the house, may change rules such as reducing the maximum bet if a player is continuously doubling their bets. In fact, casinos may have pre-existing house rules that limit how much a player can wager.
+
+### 3. Financial Contingency
+
+This simulation also presupposes that the gambler will either go bankrupt or reach the winning threshold. However, the gambler may extend their plays through debt. In the real-world, as gambling is an addictive activity, many people may continue playing even after reaching bankruptcy or the winning threshold.
