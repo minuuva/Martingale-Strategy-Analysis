@@ -5,7 +5,7 @@ format: pdf
 editor: visual
 ---
 
-# Roulette
+# Roulette Introduction
 
 A roulette table composed of 38 (or 37) evenly sized pockets on a wheel. The pockets are colored red, black, or green. The pockets are also numbered. Roulette is a game of chance in which a pocket is randomly selected. Gamblers may wager on several aspects of the outcome. For example, one may place a wager that the randomly selected pocket will be red or odd numbered or will be a specific number.
 
